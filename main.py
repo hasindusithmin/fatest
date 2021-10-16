@@ -48,24 +48,6 @@ def job1():
                 '''
                 requests.get(f'https://api.telegram.org/{token}/sendMessage?chat_id=-647851516&text={news}&parse_mode=HTML')
 
-def job2(cat):
-    load_dotenv()
-    r = requests.get(f'https://api.jokes.one/jod?category={cat}')
-    res = r.json()
-    contents = res['contents']
-    jokes = contents['jokes'][0]
-    text = jokes['joke']['text']
-    token = os.environ.get('FB_TOKEN')
-    pgid = os.environ.get('PG_ID')
-    r = requests.post(f'https://graph.facebook.com/{pgid}/feed',data={'access_token':token,'message':text}) 
-    print(r.status_code)
-
 
 sched.add_job(job1, CronTrigger.from_crontab('59 * * * *'))
-sched.add_job(job2,CronTrigger.from_crontab('30 2 * * *'),args=['jod'])
-sched.add_job(job2,CronTrigger.from_crontab('30 4 * * *'),args=['animal'])
-sched.add_job(job2,CronTrigger.from_crontab('30 6 * * *'),args=['blonde'])
-sched.add_job(job2,CronTrigger.from_crontab('30 8 * * *'),args=['knock-knock'])
-
-
 sched.start()
