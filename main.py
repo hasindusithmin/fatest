@@ -1,53 +1,59 @@
 
 
-from fastapi import FastAPI
-from apscheduler.schedulers.background import BackgroundScheduler
-from apscheduler.triggers.cron import CronTrigger
-import requests
-from bs4 import BeautifulSoup
+
+from fastapi import BackgroundTasks, FastAPI,Depends, HTTPException, status
+from jobs.tele import sendNews
+from jobs.fb import createPost
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi.security import HTTPBasic, HTTPBasicCredentials
+import secrets
 import os
-from datetime import datetime
-from dateparser.search import search_dates
-from pytz import timezone    
 from dotenv import load_dotenv
 
 
+load_dotenv()
 app = FastAPI()
-sched = BackgroundScheduler()
+security = HTTPBasic()
 
+#microservices
+origins = [
+    "https://ia88q1.deta.dev",
+    "https://blwam9.deta.dev",
+    "https://09a2hc.deta.dev",
+    "https://45lrqm.deta.dev",
+    "https://7pli6t.deta.dev"
+]
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=origins,
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+
+def auth(credentials: HTTPBasicCredentials = Depends(security)):
+    correct_username = secrets.compare_digest(credentials.username,os.environ.get('USER_NAME'))
+    correct_password = secrets.compare_digest(credentials.password,os.environ.get('PASS_WORD'))
+    if not (correct_username and correct_password):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Incorrect username or password",
+            headers={"WWW-Authenticate": "Basic"},
+        )
+    return "the task in the background"
 
 @app.get('/')
-def http():
+def index():
     return {'message':'hello world'}
 
-def job1():
-    r = requests.get('http://www.adaderana.lk/hot-news/',headers={"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/70.0.3538.77 Safari/537.36"})
-        
-    soup = BeautifulSoup(r.content,'lxml')  
+@app.get("/telegram")
+async def send_notification(background_tasks: BackgroundTasks,message:str=Depends(auth)):
+    background_tasks.add_task(sendNews)
+    return {"message": message}
 
-    stories =  soup.find_all('div',class_='news-story')
-
-
-    colombo = timezone('Asia/Colombo')
-
-    now = datetime.now(tz=colombo)
-
-
-    for story in stories:
-        time = story.find('div',class_='comments pull-right').select('span')[0].text
-        entity = search_dates(time)[0][1]    
-        if entity.strftime('%d') == now.strftime('%d'):
-            head  = story.select('h2 a')[0].text
-            body = story.find('p').text
-            load_dotenv()
-            if now.strftime('%H') == entity.strftime('%H'):
-                token = os.environ.get('BOT_TOKEN')
-                news = f'''
-                    <b>{head}</b>
-                    <pre>{body}</pre>
-                '''
-                requests.get(f'https://api.telegram.org/{token}/sendMessage?chat_id=-647851516&text={news}&parse_mode=HTML')
-
-
-sched.add_job(job1, CronTrigger.from_crontab('59 * * * *'))
-sched.start()
+@app.get('/facebook/{category}')
+async def create_post(category:str,background_tasks: BackgroundTasks,message:str=Depends(auth)):
+    background_tasks.add_task(createPost,category)
+    return {"message": message}
