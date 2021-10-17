@@ -9,15 +9,16 @@ from dotenv import load_dotenv
 
 
 def sendNews():
-    r = requests.get('http://www.adaderana.lk/hot-news/',headers={"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/70.0.3538.77 Safari/537.36"})
+    #load enviroment variable
+    load_dotenv()
+    target_url = environ.get('TARGET')
+    r = requests.get(target_url,headers={"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/70.0.3538.77 Safari/537.36"})
     #create instance variable        
     soup = BeautifulSoup(r.content,'lxml')  
     stories =  soup.find_all('div',class_='news-story')
     #sri lanka timezone
     colombo = timezone('Asia/Colombo')
     now = datetime.now(tz=colombo)
-    #load enviroment variable
-    load_dotenv()
     for story in stories:
         time = story.find('div',class_='comments pull-right').select('span')[0].text
         entity = search_dates(time)[0][1]    
